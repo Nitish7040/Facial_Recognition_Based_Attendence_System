@@ -9,6 +9,7 @@ import StudentDashboard from './pages/Dashboard/StudentDashboard';
 import FacultyDashboard from './pages/Dashboard/FacultyDashboard';
 import StudentDetails from './Pages/DashBoardDetails/StudentDetails';
 import StudentAttendance from './Pages/DashBoardDetails/StudentAttendance';
+import StudentRegister from './Pages/Registration/StudentRegister';
 
 const App = () => {
   return (
@@ -21,6 +22,7 @@ const App = () => {
         <Route path="/student-details" element={<StudentDetails />} />
         <Route path="/attendance" element={< StudentAttendance/>} />
         <Route path="/faculty-login" element={<FacultyLogin />} />
+        <Route path="/student-register" element={<StudentRegister />} />
         <Route path="/student-dashboard" element={<StudentDashboard />} />
         <Route path="/faculty-dashboard" element={<FacultyDashboard />} />
       </Routes>
