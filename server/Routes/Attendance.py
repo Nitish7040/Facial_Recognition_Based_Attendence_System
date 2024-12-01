@@ -1,67 +1,62 @@
 from flask import Blueprint, request, jsonify, Response
 import cv2
-import face_recognition
 import os
-import json
+import numpy as np
 
 attendance_blueprint = Blueprint('attendance', __name__)
 
-# OpenCV Video Capture
-video_capture = cv2.VideoCapture(0)
+# Initialize Haar Cascade for face detection
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
-# Load known faces
+# Load known faces and names
 KNOWN_FACES_DIR = "data/known_faces"
 known_faces = []
 known_names = []
 
+# Preprocess known faces
 for name in os.listdir(KNOWN_FACES_DIR):
     person_dir = os.path.join(KNOWN_FACES_DIR, name)
     for filename in os.listdir(person_dir):
         filepath = os.path.join(person_dir, filename)
-        image = face_recognition.load_image_file(filepath)
-        encoding = face_recognition.face_encodings(image)[0]
-        known_faces.append(encoding)
+        image = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
+        known_faces.append(image)
         known_names.append(name)
 
+def match_face(detected_face, known_faces, known_names):
+    """
+    Match the detected face with known faces using pixel-wise comparison.
+    """
+    detected_face = cv2.resize(detected_face, (100, 100))
+    for idx, known_face in enumerate(known_faces):
+        resized_known_face = cv2.resize(known_face, (100, 100))
+        diff = np.linalg.norm(resized_known_face - detected_face)
+        if diff < 3000:  # Threshold for recognition
+            return known_names[idx]
+    return "Unknown"
+
 def generate_frames():
+    video_capture = cv2.VideoCapture(0)
     while True:
         success, frame = video_capture.read()
         if not success:
             break
 
-        # Resize frame for faster processing
-        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
-        rgb_small_frame = small_frame[:, :, ::-1]
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray_frame, scaleFactor=1.1, minNeighbors=5)
 
-        face_locations = face_recognition.face_locations(rgb_small_frame)
-        face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+        face_name = "Unknown"
+        for (x, y, w, h) in faces:
+            detected_face = gray_frame[y:y + h, x:x + w]
+            if detected_face.size != 0:
+                face_name = match_face(detected_face, known_faces, known_names)
 
-        face_names = []
-        for face_encoding in face_encodings:
-            matches = face_recognition.compare_faces(known_faces, face_encoding)
-            name = "Unknown"
+            # Draw bounding box and name
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(frame, face_name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-            face_distances = face_recognition.face_distance(known_faces, face_encoding)
-            best_match_index = face_distances.argmin() if len(face_distances) > 0 else None
-            if best_match_index is not None and matches[best_match_index]:
-                name = known_names[best_match_index]
-
-            face_names.append(name)
-
-        for (top, right, bottom, left), name in zip(face_locations, face_names):
-            top *= 4
-            right *= 4
-            bottom *= 4
-            left *= 4
-
-            cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
-            cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 255, 0), cv2.FILLED)
-            font = cv2.FONT_HERSHEY_DUPLEX
-            cv2.putText(frame, name, (left + 6, bottom - 6), font, 0.5, (255, 255, 255), 1)
-
+        # Encode and yield the frame
         _, buffer = cv2.imencode('.jpg', frame)
         frame = buffer.tobytes()
-
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
