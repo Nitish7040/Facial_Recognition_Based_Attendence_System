@@ -81,7 +81,7 @@ const FacultyDashboard = () => {
                   className="w-10 h-10 rounded-full"
                 />
                 <h2 className="text-xl font-semibold text-gray-700">
-                  Sehdules
+                  Schedules
                 </h2>
               </div>
               <p className="text-gray-600">
